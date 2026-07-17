@@ -40,8 +40,11 @@ def _http_error_text(code: int) -> str:
     """Say what a status code means for this feed and what to do about it."""
     if code in (401, 403):
         return (
-            f"HTTP {code}: the host refused the request. Its firewall does not like "
-            "the User-Agent. Change it in File > Settings."
+            f"HTTP {code}: the host refused the request, which usually means its "
+            "firewall did not like the User-Agent. Dispatch's own default gets "
+            "through CISA and the rest. If you have changed it in File > Settings, "
+            "put it back with the Use default button: a browser-style Mozilla/5.0 "
+            "string is the one thing these firewalls reject outright."
         )
     if code == 404:
         return "HTTP 404: the feed is gone. Check the URL in Feeds > Manage feeds."

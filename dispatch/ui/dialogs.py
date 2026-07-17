@@ -549,9 +549,21 @@ class SettingsDialog(QDialog):
         self.auto_refresh.setToolTip("Refresh on a timer while the window is open. 0 turns it off.")
         form_fetch.addRow("Auto refresh", self.auto_refresh)
 
+        ua_row = QHBoxLayout()
+        ua_row.setSpacing(6)
         self.user_agent = QLineEdit(str(self._settings.get("user_agent", "")))
-        self.user_agent.setToolTip("Sent to every feed host. Some block blank or generic agents.")
-        form_fetch.addRow("User-Agent", self.user_agent)
+        self.user_agent.setToolTip(
+            "Sent to every feed host.\n\n"
+            "Leave this alone unless you have a reason. The shipped value gets "
+            "through every default feed. Firewalls at CISA and others reject "
+            "browser-style Mozilla/5.0 strings and bare names with no version, "
+            "so imitating a browser makes things worse, not better."
+        )
+        ua_row.addWidget(self.user_agent, 1)
+        self.btn_ua_default = QPushButton("Use default")
+        self.btn_ua_default.setToolTip("Put the shipped User-Agent back")
+        ua_row.addWidget(self.btn_ua_default)
+        form_fetch.addRow("User-Agent", ua_row)
 
         layout.addWidget(group_fetch)
 
@@ -585,6 +597,9 @@ class SettingsDialog(QDialog):
         layout.addWidget(buttons)
 
         self.btn_defaults.clicked.connect(self.reset_defaults)
+        self.btn_ua_default.clicked.connect(
+            lambda: self.user_agent.setText(DEFAULT_SETTINGS["user_agent"])
+        )
 
     def reset_defaults(self) -> None:
         self.threshold.setValue(DEFAULT_SETTINGS["cluster_threshold"])
