@@ -88,24 +88,8 @@ def load_settings() -> Dict[str, Any]:
 
 
 def save_settings(settings: Dict[str, Any]) -> None:
-    """
-    Write only what differs from the defaults.
-
-    Writing every key looks harmless until a default changes. The stored copy
-    wins on load, so a value the user never chose gets pinned forever and the
-    new default never reaches them. That is not hypothetical: the first
-    User-Agent this app shipped got refused by CISA's firewall, and anyone
-    carrying a full config would have kept the broken one after the fix landed.
-
-    Keeping the file to real choices also means it stays short enough to read
-    and edit by hand.
-    """
-    changed = {
-        k: v
-        for k, v in settings.items()
-        if k in DEFAULT_SETTINGS and v != DEFAULT_SETTINGS[k]
-    }
+    clean = {k: v for k, v in settings.items() if k in DEFAULT_SETTINGS}
     tmp = config_path().with_suffix(".json.tmp")
     with tmp.open("w", encoding="utf-8") as fh:
-        json.dump(changed, fh, indent=2, sort_keys=True)
+        json.dump(clean, fh, indent=2)
     tmp.replace(config_path())
