@@ -16,9 +16,11 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.error import HTTPError, URLError
 
 import feedparser
+import urllib.request
 
 from . import cluster as clu
 from .db import Database
+from .kev import is_kev_url, parse_kev
 
 MAX_SUMMARY_CHARS = 4000
 
@@ -130,6 +132,12 @@ def fetch_feed(
 ) -> FetchResult:
     """Pull one feed. Conditional GET when the host gave us a validator."""
     result = FetchResult(feed_id=feed_id, feed_name=feed_name)
+
+    # The KEV catalog is JSON, not a feed. feedparser would call it malformed
+    # and be right, so it gets its own path.
+    if is_kev_url(url):
+        return _fetch_kev(result, url, user_agent, timeout)
+
     old_timeout = socket.getdefaulttimeout()
     socket.setdefaulttimeout(timeout)
     try:
@@ -201,6 +209,33 @@ def fetch_feed(
                 "published": _entry_published(entry),
             }
         )
+
+    if not result.entries:
+        result.status = "empty"
+    return result
+
+
+def _fetch_kev(result: FetchResult, url: str, user_agent: str, timeout: int) -> FetchResult:
+    """Pull CISA's KEV catalog and turn it into entries."""
+    request = urllib.request.Request(url, headers={"User-Agent": user_agent})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            payload = response.read(12_000_000)
+    except HTTPError as exc:
+        result.status = "error"
+        result.error = _http_error_text(exc.code)
+        return result
+    except (URLError, socket.timeout, OSError, ValueError) as exc:
+        result.status = "error"
+        result.error = f"Could not reach the KEV catalog: {str(exc)[:150]}"
+        return result
+
+    try:
+        result.entries = parse_kev(payload, result.feed_id)
+    except ValueError as exc:
+        result.status = "error"
+        result.error = f"The KEV catalog did not look right: {exc}"
+        return result
 
     if not result.entries:
         result.status = "empty"

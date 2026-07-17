@@ -142,7 +142,7 @@ class Database:
         """
         from .defaults import FEED_MIGRATIONS
 
-        for old, new in FEED_MIGRATIONS.items():
+        for old, (new, new_name) in FEED_MIGRATIONS.items():
             row = self.conn.execute(
                 "SELECT id FROM feeds WHERE url=?", (old,)
             ).fetchone()
@@ -155,6 +155,13 @@ class Database:
                 # The new address is already in the list. Drop the stale copy
                 # rather than leave a duplicate that fails on every refresh.
                 self.conn.execute("DELETE FROM feeds WHERE id=?", (row["id"],))
+                continue
+            if new_name:
+                self.conn.execute(
+                    "UPDATE feeds SET url=?, name=?, etag=NULL, modified=NULL,"
+                    " last_status=NULL WHERE id=?",
+                    (new, new_name, row["id"]),
+                )
             else:
                 self.conn.execute(
                     "UPDATE feeds SET url=?, etag=NULL, modified=NULL, last_status=NULL"

@@ -10,7 +10,7 @@ Written by LJ "HawaiizFynest" Eblacas — Colorado Vista IT Solutions
 
 ## What it does
 
-**Ingest.** Eighteen security outlets ship configured out of the box: BleepingComputer, The Hacker News, Krebs, The Record, Ars Security, CISA advisories, SANS ISC, Project Zero, Talos, and more. Add your own, disable the noisy ones.
+**Ingest.** Eighteen security sources ship configured out of the box: BleepingComputer, The Hacker News, Krebs, The Record, Ars Security, SANS ISC, Project Zero, Talos, and CISA's Known Exploited Vulnerabilities catalog. Add your own, disable the noisy ones.
 
 **Dedupe.** When Microsoft ships a zero-day fix, five outlets write it up within an hour. Dispatch collapses those into one entry with every source attached, so you triage the story once instead of five times.
 
@@ -170,6 +170,14 @@ Uncheck a feed to skip it without losing the stories you already pulled from it.
 ## Roundups
 
 Some threads work better as one post covering ten stories. Select several rows in the queue, pick **Weekly roundup** or **Patch roundup** from the template list, and the post builds from all of them. Whatever you type in the notes box becomes the intro.
+
+## The KEV catalog
+
+CISA retired its RSS feeds in May 2025 with no replacement. The Known Exploited Vulnerabilities catalog survived as a plain JSON file, and Dispatch reads it directly.
+
+It is better material than the old advisories feed. Every entry is a vulnerability someone is already exploiting, and it arrives with the vendor, the product, the required fix, the federal deadline, and whether ransomware crews have picked it up. Entries link to NVD, which is another federal source, so full text works on them.
+
+Only the last 45 days come through. The catalog holds over 1,600 entries and pulling the lot would bury the inbox.
 
 ## Full text
 

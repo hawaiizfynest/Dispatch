@@ -17,7 +17,7 @@ DEFAULT_FEEDS: List[Tuple[str, str]] = [
     ("Ars Technica — Security", "https://arstechnica.com/security/feed"),
     ("SecurityWeek", "https://feeds.feedburner.com/securityweek"),
     ("Dark Reading", "https://www.darkreading.com/rss.xml"),
-    ("CISA Advisories", "https://www.cisa.gov/cybersecurity-advisories/all.xml"),
+    ("CISA Known Exploited Vulnerabilities", "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"),
     ("SANS Internet Storm Center", "https://isc.sans.edu/rssfeed_full.xml"),
     ("Schneier on Security", "https://www.schneier.com/feed/atom/"),
     ("Google Project Zero", "https://googleprojectzero.blogspot.com/feeds/posts/default"),
@@ -32,18 +32,41 @@ DEFAULT_FEEDS: List[Tuple[str, str]] = [
 
 # Outlets move their feeds and the old address does not always redirect
 # somewhere useful. Sophos points its old one at a doubled path that parses to
-# nothing; Ars just returns 404. A new URL in DEFAULT_FEEDS above reaches nobody
-# who has already run the app, because seeding only touches an empty database,
-# so known moves get repaired here on open.
+# nothing; Ars just returns 404; CISA retired RSS altogether in May 2025 and
+# left the endpoint answering some networks and refusing others. A new URL in
+# DEFAULT_FEEDS above reaches nobody who has already run the app, because
+# seeding only touches an empty database, so known moves get repaired here.
 #
 # This is not migration bookkeeping for old versions. Feeds rot on their own
 # schedule and always will, so this table is permanent.
+#
+# old url -> (new url, new name or None to keep the existing one)
 FEED_MIGRATIONS = {
-    "https://feeds.arstechnica.com/arstechnica/security": "https://arstechnica.com/security/feed",
-    "http://feeds.arstechnica.com/arstechnica/security": "https://arstechnica.com/security/feed",
-    "https://news.sophos.com/en-us/feed/": "https://www.sophos.com/en-us/blog/feed",
-    "https://news.sophos.com/en-us/feed": "https://www.sophos.com/en-us/blog/feed",
-    "https://nakedsecurity.sophos.com/feed/": "https://www.sophos.com/en-us/blog/feed",
+    "https://feeds.arstechnica.com/arstechnica/security": (
+        "https://arstechnica.com/security/feed", None,
+    ),
+    "http://feeds.arstechnica.com/arstechnica/security": (
+        "https://arstechnica.com/security/feed", None,
+    ),
+    "https://news.sophos.com/en-us/feed/": (
+        "https://www.sophos.com/en-us/blog/feed", None,
+    ),
+    "https://news.sophos.com/en-us/feed": (
+        "https://www.sophos.com/en-us/blog/feed", None,
+    ),
+    "https://nakedsecurity.sophos.com/feed/": (
+        "https://www.sophos.com/en-us/blog/feed", None,
+    ),
+    # The advisories feed is gone. The KEV catalog is what CISA still publishes
+    # for machines, so the name changes too rather than lying about what it is.
+    "https://www.cisa.gov/cybersecurity-advisories/all.xml": (
+        "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
+        "CISA Known Exploited Vulnerabilities",
+    ),
+    "https://www.cisa.gov/uscert/ncas/alerts.xml": (
+        "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
+        "CISA Known Exploited Vulnerabilities",
+    ),
 }
 
 CATEGORIES: List[str] = [
