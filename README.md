@@ -143,11 +143,13 @@ Releases are automatic. Tag a commit `v1.0.0` and push it, and the workflow buil
 
 In GitHub Desktop:
 
-1. Bump `__version__` in `dispatch/__init__.py` first. The build compares it against the tag and stops if they disagree, which beats shipping an exe whose About box claims the wrong version.
+1. Bump `__version__` in `dispatch/__init__.py` **first**. Do this before anything else. The build compares the tag against it and stops if they disagree, which beats shipping an exe whose About box claims the wrong version.
 2. Commit that and push it.
-3. Open the **History** tab, right-click the commit you want to release, and choose **Create Tag**.
+3. Open the **History** tab, right-click the commit you just pushed, and choose **Create Tag**.
 4. Name the tag to match the version with a `v` in front: `v1.0.0` for version `1.0.0`.
 5. Hit **Push origin**. The tag goes up and the build starts.
+
+Step 1 is first for a reason. GitHub Desktop only deletes tags it has not pushed yet, so a tag that went up against the wrong commit cannot be moved or reused from Desktop at all. Getting out of that means the git command line. Skip the version bump and the cheapest way forward is usually to bump to the next number and tag again, leaving the bad tag to be cleaned up on the web whenever you feel like it. Bumping first costs nothing and avoids the whole thing.
 
 Watch it under the **Actions** tab on GitHub. It takes a few minutes, most of it PyInstaller.
 

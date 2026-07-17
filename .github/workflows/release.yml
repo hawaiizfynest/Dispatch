@@ -61,7 +61,23 @@ jobs:
           TAG_BASE="${TAG%%-*}"
           SRC=$(python -c "import dispatch; print(dispatch.__version__)")
           if [ "$TAG_BASE" != "$SRC" ]; then
-            echo "::error::Tag ${GITHUB_REF_NAME} says ${TAG_BASE} but dispatch/__init__.py says ${SRC}. Bump one to match the other."
+            {
+              echo "### Version mismatch"
+              echo ""
+              echo "Tag \`${GITHUB_REF_NAME}\` wants version \`${TAG_BASE}\`."
+              echo "\`dispatch/__init__.py\` says \`${SRC}\`."
+              echo ""
+              echo "The exe reads its version from the source, so this build would"
+              echo "publish a release called ${GITHUB_REF_NAME} containing a binary"
+              echo "that calls itself ${SRC}."
+              echo ""
+              echo "**Fixing it:** a pushed tag cannot be reused from GitHub Desktop,"
+              echo "which only deletes tags it has not pushed yet. Rather than fight"
+              echo "that, set \`__version__\` to the next number, commit it, push, and"
+              echo "tag that commit. The stray tag can be deleted on the web later;"
+              echo "no release was created, so nothing is pointing at it."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Tag ${GITHUB_REF_NAME} wants ${TAG_BASE} but dispatch/__init__.py says ${SRC}. Bump __version__, commit, then tag that commit. See the job summary."
             exit 1
           fi
           echo "Tag ${GITHUB_REF_NAME} matches version ${SRC}."
