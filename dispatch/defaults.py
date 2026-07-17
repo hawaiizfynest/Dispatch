@@ -14,7 +14,7 @@ DEFAULT_FEEDS: List[Tuple[str, str]] = [
     ("The Hacker News", "https://feeds.feedburner.com/TheHackersNews"),
     ("Krebs on Security", "https://krebsonsecurity.com/feed/"),
     ("The Record", "https://therecord.media/feed/"),
-    ("Ars Technica — Security", "https://feeds.arstechnica.com/arstechnica/security"),
+    ("Ars Technica — Security", "https://arstechnica.com/security/feed"),
     ("SecurityWeek", "https://feeds.feedburner.com/securityweek"),
     ("Dark Reading", "https://www.darkreading.com/rss.xml"),
     ("CISA Advisories", "https://www.cisa.gov/cybersecurity-advisories/all.xml"),
