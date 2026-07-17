@@ -121,6 +121,7 @@ class Database:
                 "INSERT INTO meta(key, value) VALUES('schema_version', ?)",
                 (str(SCHEMA_VERSION),),
             )
+        self._migrate_feed_urls()
         self.conn.commit()
 
     # When a future version changes the schema, add the upgrade here and bump
@@ -130,6 +131,37 @@ class Database:
     # already exists, so a database can sit a version behind while its version
     # number claims otherwise, and every template then breaks on a column that
     # was never added.
+
+    def _migrate_feed_urls(self) -> None:
+        """
+        Repoint feeds whose outlet moved them. Safe to run twice.
+
+        Leaves a URL alone once it has been edited by hand: the table is keyed
+        on the exact address that shipped, so anything else is your own choice
+        and stays put.
+        """
+        from .defaults import FEED_MIGRATIONS
+
+        for old, new in FEED_MIGRATIONS.items():
+            row = self.conn.execute(
+                "SELECT id FROM feeds WHERE url=?", (old,)
+            ).fetchone()
+            if row is None:
+                continue
+            clash = self.conn.execute(
+                "SELECT id FROM feeds WHERE url=? AND id<>?", (new, row["id"])
+            ).fetchone()
+            if clash is not None:
+                # The new address is already in the list. Drop the stale copy
+                # rather than leave a duplicate that fails on every refresh.
+                self.conn.execute("DELETE FROM feeds WHERE id=?", (row["id"],))
+            else:
+                self.conn.execute(
+                    "UPDATE feeds SET url=?, etag=NULL, modified=NULL, last_status=NULL"
+                    " WHERE id=?",
+                    (new, row["id"]),
+                )
+        self.conn.commit()
 
     def seed_if_empty(self) -> None:
         """Load default feeds and templates on a fresh database."""

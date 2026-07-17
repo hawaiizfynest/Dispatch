@@ -30,6 +30,22 @@ DEFAULT_FEEDS: List[Tuple[str, str]] = [
     ("Graham Cluley", "https://grahamcluley.com/feed/"),
 ]
 
+# Outlets move their feeds and the old address does not always redirect
+# somewhere useful. Sophos points its old one at a doubled path that parses to
+# nothing; Ars just returns 404. A new URL in DEFAULT_FEEDS above reaches nobody
+# who has already run the app, because seeding only touches an empty database,
+# so known moves get repaired here on open.
+#
+# This is not migration bookkeeping for old versions. Feeds rot on their own
+# schedule and always will, so this table is permanent.
+FEED_MIGRATIONS = {
+    "https://feeds.arstechnica.com/arstechnica/security": "https://arstechnica.com/security/feed",
+    "http://feeds.arstechnica.com/arstechnica/security": "https://arstechnica.com/security/feed",
+    "https://news.sophos.com/en-us/feed/": "https://www.sophos.com/en-us/blog/feed",
+    "https://news.sophos.com/en-us/feed": "https://www.sophos.com/en-us/blog/feed",
+    "https://nakedsecurity.sophos.com/feed/": "https://www.sophos.com/en-us/blog/feed",
+}
+
 CATEGORIES: List[str] = [
     "ransomware",
     "vulnerability",

@@ -69,6 +69,27 @@ def config_path() -> Path:
     return data_dir() / "config.json"
 
 
+def _heal_user_agent(stored: str) -> str:
+    """
+    Replace a User-Agent this app wrote in an older version.
+
+    A value starting with "Dispatch/" came from a previous default, not from
+    anybody's decision, so it gets brought up to date. The first one shipped
+    was refused by CISA's firewall, and leaving it in place means the fix never
+    reaches the people who hit the bug.
+
+    Anything else is a deliberate override and stays exactly as written, which
+    is the whole point of exposing the setting.
+    """
+    if not stored:
+        return USER_AGENT
+    if stored == USER_AGENT:
+        return stored
+    if stored.lower().startswith("dispatch/"):
+        return USER_AGENT
+    return stored
+
+
 def load_settings() -> Dict[str, Any]:
     """Read config.json, filling anything missing from defaults."""
     settings = dict(DEFAULT_SETTINGS)
@@ -84,6 +105,7 @@ def load_settings() -> Dict[str, Any]:
         except (json.JSONDecodeError, OSError):
             # A corrupt config should not stop the app from opening.
             pass
+    settings["user_agent"] = _heal_user_agent(str(settings.get("user_agent", "")))
     return settings
 
 
