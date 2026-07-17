@@ -1,0 +1,134 @@
+# Builds Dispatch.exe and attaches it to a release.
+#
+# Pushing a tag that starts with v builds the executable and publishes a
+# release carrying it. Running the workflow by hand builds the same executable
+# and leaves it as an artifact without releasing anything, which is the way to
+# check a build before committing to a version number.
+#
+# Written by LJ "HawaiizFynest" Eblacas — Colorado Vista IT Solutions
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # The exe carries its own interpreter, so this is the Python the build runs
+  # on, not one anybody needs installed. Held a little behind the newest release
+  # because PyInstaller and PyQt6 both take a while to catch up to a new one.
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  build:
+    name: Build Windows executable
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Check the code compiles
+        run: python -m compileall -q dispatch main.py tools
+
+      - name: Check the package imports
+        run: python -c "import dispatch; print(f'Dispatch {dispatch.__version__}')"
+
+      - name: Check the tag matches the version in the source
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          # A prerelease tag carries a suffix the source version does not:
+          # v1.0.0-beta1 ships __version__ 1.0.0. Compare the base only.
+          TAG_BASE="${TAG%%-*}"
+          SRC=$(python -c "import dispatch; print(dispatch.__version__)")
+          if [ "$TAG_BASE" != "$SRC" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} says ${TAG_BASE} but dispatch/__init__.py says ${SRC}. Bump one to match the other."
+            exit 1
+          fi
+          echo "Tag ${GITHUB_REF_NAME} matches version ${SRC}."
+
+      - name: Write the Windows version resource
+        run: python tools/version_info.py version_info.txt
+
+      - name: Build the executable
+        run: >
+          python -m PyInstaller
+          --onefile
+          --windowed
+          --name Dispatch
+          --version-file version_info.txt
+          --noconfirm
+          --clean
+          main.py
+
+      - name: Check the executable starts and stays up
+        shell: pwsh
+        run: |
+          $exe = "dist\Dispatch.exe"
+          if (-not (Test-Path $exe)) {
+            Write-Error "No executable at $exe."
+            exit 1
+          }
+          $size = (Get-Item $exe).Length
+          Write-Host ("Built {0:N1} MB" -f ($size / 1MB))
+          if ($size -lt 10MB) {
+            Write-Error "The exe is $size bytes. Something did not get bundled."
+            exit 1
+          }
+
+          # A window app that exits on its own is broken: a missing DLL, an
+          # import that did not survive freezing, a crash before the window
+          # opens. Give it long enough to fall over and see if it does.
+          $proc = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 20
+          if ($proc.HasExited) {
+            Write-Error "Dispatch.exe quit on its own with exit code $($proc.ExitCode). It should still be running."
+            exit 1
+          }
+          Stop-Process -Id $proc.Id -Force
+          Write-Host "The exe launched and stayed up."
+
+      - name: Upload the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dispatch-windows
+          path: dist/Dispatch.exe
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Dispatch.exe
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body: |
+            ## Dispatch ${{ github.ref_name }}
+
+            Download `Dispatch.exe` below. It carries its own Python and its own
+            Qt, so it runs on a machine with neither. No installer, nothing to
+            unpack.
+
+            Your stories and settings live in `%APPDATA%\Dispatch\`. Dropping a
+            new exe over the old one leaves both alone.

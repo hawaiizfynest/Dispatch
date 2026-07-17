@@ -1,0 +1,40 @@
+# Build output. PyInstaller writes all of this and none of it belongs in the
+# repository. Without this file GitHub Desktop offers you an 80 MB exe to
+# commit every time you build one.
+build/
+dist/
+*.spec
+version_info.txt
+
+# Generated at build time from dispatch/__init__.py
+*.manifest
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Dispatch's own data, if you ever run it from inside the checkout
+dispatch.db
+dispatch.db-wal
+dispatch.db-shm
+config.json
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
