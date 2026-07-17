@@ -165,3 +165,55 @@ def fetch_fulltext(
     if truncated:
         status += " Trimmed to fit a forum post."
     return text, status
+
+
+def probe_feed(url: str, user_agent: str, timeout: int = 20) -> str:
+    """
+    Fetch a feed URL raw and report exactly what came back.
+
+    Exists because a 403 tells you a host refused the request and nothing else.
+    Guessing at the reason from the status code alone sends people to change
+    settings that were never wrong, so this shows the reply and lets you read it.
+    """
+    lines = [f"URL:        {url}", f"User-Agent: {user_agent}", ""]
+
+    request = urllib.request.Request(url, headers={"User-Agent": user_agent})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            body = response.read(400)
+            lines.append(f"Status:     {response.status} {response.reason}")
+            lines.append(f"Final URL:  {response.url}")
+            lines.append(f"Type:       {response.headers.get('Content-Type', '?')}")
+            lines.append(f"Server:     {response.headers.get('Server', '(none)')}")
+            lines.append("")
+            lines.append("First bytes of the reply:")
+            lines.append(repr(body[:300]))
+    except HTTPError as exc:
+        body = b""
+        try:
+            body = exc.read(400)
+        except Exception:
+            pass
+        lines.append(f"Status:     HTTP {exc.code} {exc.reason}")
+        lines.append(f"Server:     {exc.headers.get('Server', '(none)') if exc.headers else '?'}")
+        ray = exc.headers.get("cf-ray") if exc.headers else None
+        akamai = exc.headers.get("x-reference-error") if exc.headers else None
+        if ray:
+            lines.append(f"cf-ray:     {ray}   (Cloudflare is doing the blocking)")
+        if akamai:
+            lines.append(f"Akamai ref: {akamai}")
+        lines.append("")
+        lines.append("First bytes of the reply:")
+        lines.append(repr(body[:300]) if body else "(empty)")
+        lines.append("")
+        if exc.code in (401, 403):
+            lines.append(
+                "A 403 does not name its reason. Open this URL in a browser: if it "
+                "loads there, the host is refusing this app specifically. If the "
+                "browser is refused too, the block is on your connection and no "
+                "setting here will move it."
+            )
+    except (URLError, socket.timeout, OSError, ValueError) as exc:
+        lines.append(f"Failed before any reply: {str(exc)[:200]}")
+
+    return "\n".join(lines)

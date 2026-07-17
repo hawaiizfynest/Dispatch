@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+    QApplication, QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
     QFormLayout, QGroupBox, QHBoxLayout, QHeaderView, QInputDialog, QLabel,
     QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPushButton,
     QSpinBox, QSplitter, QTextEdit, QTreeWidget, QTreeWidgetItem, QVBoxLayout,
@@ -21,7 +21,9 @@ from PyQt6.QtWidgets import (
 from .. import __app_name__, __author__, __org__, __version__
 from ..config import DEFAULT_SETTINGS
 from ..db import Database
+from ..config import load_settings
 from ..defaults import DEFAULT_FEEDS, TEMPLATE_TOKENS
+from ..fulltext import probe_feed
 from . import theme
 
 MONO = "Consolas, Menlo, DejaVu Sans Mono"
@@ -62,11 +64,14 @@ class FeedManagerDialog(QDialog):
         self.btn_add = QPushButton("Add feed")
         self.btn_add.setObjectName("primary")
         self.btn_edit = QPushButton("Edit")
+        self.btn_test = QPushButton("Test")
+        self.btn_test.setToolTip("Fetch this feed now and show exactly what came back")
         self.btn_remove = QPushButton("Remove")
         self.btn_remove.setObjectName("danger")
         self.btn_restore = QPushButton("Restore defaults")
         row.addWidget(self.btn_add)
         row.addWidget(self.btn_edit)
+        row.addWidget(self.btn_test)
         row.addWidget(self.btn_remove)
         row.addStretch()
         row.addWidget(self.btn_restore)
@@ -79,6 +84,7 @@ class FeedManagerDialog(QDialog):
 
         self.btn_add.clicked.connect(self.add_feed)
         self.btn_edit.clicked.connect(self.edit_feed)
+        self.btn_test.clicked.connect(self.test_feed)
         self.btn_remove.clicked.connect(self.remove_feeds)
         self.btn_restore.clicked.connect(self.restore_defaults)
         self.tree.itemDoubleClicked.connect(lambda *_: self.edit_feed())
@@ -145,6 +151,34 @@ class FeedManagerDialog(QDialog):
             return
         self.db.update_feed(feed_id, name, url, item.checkState(0) == Qt.CheckState.Checked)
         self.reload()
+
+    def test_feed(self) -> None:
+        """Show the raw reply so nobody has to guess what a 403 meant."""
+        item = self.tree.currentItem()
+        if item is None:
+            QMessageBox.information(self, "Test feed", "Pick a feed first.")
+            return
+        settings = load_settings()
+        self.btn_test.setEnabled(False)
+        self.btn_test.setText("Testing...")
+        QApplication.processEvents()
+        try:
+            report = probe_feed(
+                item.text(1),
+                settings.get("user_agent", ""),
+                int(settings.get("fetch_timeout", 20)),
+            )
+        finally:
+            self.btn_test.setEnabled(True)
+            self.btn_test.setText("Test")
+
+        box = QMessageBox(self)
+        box.setWindowTitle(f"Test: {item.text(0)}")
+        box.setIcon(QMessageBox.Icon.Information)
+        box.setText(f"Raw result for {item.text(0)}.")
+        box.setDetailedText(report)
+        box.setStyleSheet(theme.STYLESHEET)
+        box.exec()
 
     def remove_feeds(self) -> None:
         items = self.tree.selectedItems()
