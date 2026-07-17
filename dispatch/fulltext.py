@@ -167,53 +167,85 @@ def fetch_fulltext(
     return text, status
 
 
+# Standard feed-reader identities, used only to work out whether a refusal is
+# about the User-Agent at all. Nothing rotates through these behind your back:
+# the refresh sends whatever is in Settings and nothing else.
+PROBE_AGENTS = [
+    ("feedparser default", "feedparser/6.0.12 +https://github.com/kurtmckee/feedparser/"),
+    ("bare name and version", "Dispatch/1.0"),
+]
+
+
+def _try_once(url: str, user_agent: str, timeout: int):
+    """Returns (status, note, body_head)."""
+    request = urllib.request.Request(url, headers={"User-Agent": user_agent})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return response.status, response.headers.get("Content-Type", "?"), response.read(300)
+    except HTTPError as exc:
+        body = b""
+        try:
+            body = exc.read(300)
+        except Exception:
+            pass
+        marks = []
+        if exc.headers:
+            if exc.headers.get("cf-ray"):
+                marks.append("Cloudflare")
+            if exc.headers.get("x-reference-error") or b"Reference #" in body:
+                marks.append("Akamai")
+            if exc.headers.get("Server"):
+                marks.append(f"Server: {exc.headers.get('Server')}")
+        return exc.code, ", ".join(marks) or "(no clue in the headers)", body
+    except (URLError, socket.timeout, OSError, ValueError) as exc:
+        return None, str(exc)[:120], b""
+
+
 def probe_feed(url: str, user_agent: str, timeout: int = 20) -> str:
     """
     Fetch a feed URL raw and report exactly what came back.
 
-    Exists because a 403 tells you a host refused the request and nothing else.
-    Guessing at the reason from the status code alone sends people to change
-    settings that were never wrong, so this shows the reply and lets you read it.
+    A 403 says a host refused the request and nothing more. Guessing at the
+    reason sends people to change settings that were never wrong, so this shows
+    the reply. When the configured agent is refused it retries with a couple of
+    ordinary reader identities, which answers the only question that matters
+    next: is this about the User-Agent, or about you?
     """
     lines = [f"URL:        {url}", f"User-Agent: {user_agent}", ""]
 
-    request = urllib.request.Request(url, headers={"User-Agent": user_agent})
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            body = response.read(400)
-            lines.append(f"Status:     {response.status} {response.reason}")
-            lines.append(f"Final URL:  {response.url}")
-            lines.append(f"Type:       {response.headers.get('Content-Type', '?')}")
-            lines.append(f"Server:     {response.headers.get('Server', '(none)')}")
-            lines.append("")
-            lines.append("First bytes of the reply:")
-            lines.append(repr(body[:300]))
-    except HTTPError as exc:
-        body = b""
-        try:
-            body = exc.read(400)
-        except Exception:
-            pass
-        lines.append(f"Status:     HTTP {exc.code} {exc.reason}")
-        lines.append(f"Server:     {exc.headers.get('Server', '(none)') if exc.headers else '?'}")
-        ray = exc.headers.get("cf-ray") if exc.headers else None
-        akamai = exc.headers.get("x-reference-error") if exc.headers else None
-        if ray:
-            lines.append(f"cf-ray:     {ray}   (Cloudflare is doing the blocking)")
-        if akamai:
-            lines.append(f"Akamai ref: {akamai}")
-        lines.append("")
-        lines.append("First bytes of the reply:")
-        lines.append(repr(body[:300]) if body else "(empty)")
-        lines.append("")
-        if exc.code in (401, 403):
-            lines.append(
-                "A 403 does not name its reason. Open this URL in a browser: if it "
-                "loads there, the host is refusing this app specifically. If the "
-                "browser is refused too, the block is on your connection and no "
-                "setting here will move it."
-            )
-    except (URLError, socket.timeout, OSError, ValueError) as exc:
-        lines.append(f"Failed before any reply: {str(exc)[:200]}")
+    status, note, body = _try_once(url, user_agent, timeout)
+    lines.append(f"Status:     {status if status else 'no reply'}")
+    lines.append(f"Detail:     {note}")
+    lines.append("")
+    lines.append("First bytes of the reply:")
+    lines.append(repr(body[:280]) if body else "(empty)")
 
+    if status == 200:
+        lines.append("")
+        lines.append("This feed is fine.")
+        return "\n".join(lines)
+
+    if status in (401, 403):
+        lines.append("")
+        lines.append("Refused. Trying other identities to see whether the agent matters:")
+        any_ok = False
+        for label, agent in PROBE_AGENTS:
+            other, other_note, _ = _try_once(url, agent, timeout)
+            mark = "WORKS" if other == 200 else f"{other or 'no reply'}"
+            lines.append(f"  {mark:9} {label}: {agent[:52]}")
+            if other == 200:
+                any_ok = True
+        lines.append("")
+        if any_ok:
+            lines.append(
+                "Another identity got through, so this host objects to the agent "
+                "rather than to you. Put a working one in File > Settings."
+            )
+        else:
+            lines.append(
+                "Every identity was refused while the same URL loads in your "
+                "browser. That points at the host's bot detection reading the "
+                "connection itself, not the agent string. No setting in here "
+                "changes that. Disable the feed, or reach it another way."
+            )
     return "\n".join(lines)
